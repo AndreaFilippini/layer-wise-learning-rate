@@ -57,7 +57,7 @@ if __name__ == '__main__':
 
     # in this example the dict is built in such a way that for each layer before the dense section
     # a multiplier is associated with a value reduced to the previous one by a factor of root of two
-    # alternatively, you can specify in the dict he name of the layer and the corresponding multiplier
+    # alternatively, you can specify in the dict the name of the layer and the corresponding multiplier
     multiplier = {}
     new_keras = hasattr(opt, 'update_step')
     trainable = [(layer.path if new_keras else layer.name).split('/')[0] for layer in model.trainable_variables]
@@ -73,6 +73,5 @@ if __name__ == '__main__':
             multiplier |= {layer : current_mul}
             current_mul /= lr_factor
     
-    multiplier = {'fc1' : 0.9, 'fc2' : 0.4}
     # use the wrapper to instantiate the optimizer and multiplier values
     opt = Multiplier(opt, multiplier)
