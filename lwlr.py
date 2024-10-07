@@ -24,17 +24,18 @@ class Multiplier(Optimizer):
         self._multiplier = multiplier
 
     # function used to apply a multiplier to a specific layer
-    def calculate_grad(self, grad, var):
+    def mul_param(self, param, var):
         # get layer name
         layer_key = var.name.split('/')[0]      
-        # if there's a multiplier value associated with the layer, apply it to the gradient
+        # if there's a multiplier value associated with the layer, apply it to the parameter
         if layer_key in self._multiplier:
-            grad *= self._multiplier[layer_key]
-        return grad
+            param *= self._multiplier[layer_key]
+        return param
             
     # update step used in keras 3.X
-    def update_step(self, grad, var, learning_rate):       
-        self._optimizer.update_step(self.calculate_grad(grad, var), var, learning_rate)
+    def update_step(self, grad, var, learning_rate):
+        new_lr = self.mul_param(self._optimizer.learning_rate, var)
+        self._optimizer.update_step(grad, var, new_lr)
 
     def build(self, var_list):
         super().build(var_list)
@@ -43,8 +44,8 @@ class Multiplier(Optimizer):
     # update step used in keras 2.X
     @tf.function
     def _resource_apply_dense(self, grad, var):
-        self._optimizer._resource_apply_dense(self.calculate_grad(grad, var), var)
-        
+        self._optimizer._resource_apply_dense(self.mul_param(grad, var), var)
+
     def _create_slots(self, var_list):
         self._optimizer._create_slots(var_list)
         
