@@ -1,5 +1,5 @@
 # Layer Wise Learning Rate
-Layer wise learning rate for tensorflow/keras that applies different learnign rate to different layers of a neural network
+Layer wise learning rate for tensorflow/keras that applies different learning rate values to different layers of a neural network
 
 # Examples
 Once the optimizer is encapsulated inside the 'LayerWiseLR' wrapper class, you can assign to each layer a multiplier that will be applied to the learning rate during the optimization
