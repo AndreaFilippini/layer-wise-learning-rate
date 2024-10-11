@@ -7,19 +7,13 @@ from keras.applications.vgg16 import VGG16
 
 import math
 
-class Multiplier(Optimizer):
-    """
-    Wrapper used to implement multipliers for the gradient for specific layers in the model
-    Arguments:
-        optimizer: instance of the optimizer
-        multiplier: dictionary containing pairs of {layer name : multiplier}
-    """
-    def __init__(self, optimizer, multiplier, learning_rate=0.001, name="LRM", **kwargs):
+class LayerWiseLR(Optimizer):
+    def __init__(self, optimizer, multiplier, learning_rate=0.001, name="LWLR", **kwargs):
         if hasattr(optimizer, 'update_step'):
             super().__init__(learning_rate, **kwargs)
         else:
             super().__init__(name, **kwargs)
-            self._set_hyper("learning_rate", kwargs.get("lr", learning_rate))            
+            self._set_hyper("learning_rate", learning_rate)
         self._optimizer = optimizer
         self._multiplier = multiplier
 
@@ -34,7 +28,7 @@ class Multiplier(Optimizer):
             
     # update step used in keras 3.X
     def update_step(self, grad, var, learning_rate):
-        new_lr = self.mul_param(self._optimizer.learning_rate, var)
+        new_lr = self.mul_param(learning_rate, var)
         self._optimizer.update_step(grad, var, new_lr)
 
     def build(self, var_list):
@@ -43,18 +37,23 @@ class Multiplier(Optimizer):
         
     # update step used in keras 2.X
     @tf.function
-    def _resource_apply_dense(self, grad, var):
-        self._optimizer._resource_apply_dense(self.mul_param(grad, var), var)
+    def _resource_apply_dense(self, grad, var):       
+        new_lr = K.eval(self._get_hyper("learning_rate"))
+        new_lr = self.mul_param(new_lr, var)
+        self._optimizer.learning_rate.assign(new_lr)
+        self._optimizer._resource_apply_dense(grad, var)
 
     def _create_slots(self, var_list):
+        super()._create_slots(var_list)
         self._optimizer._create_slots(var_list)
         
 if __name__ == '__main__':
     # load VGG16
     model = VGG16(weights='imagenet')
     
-    # load the optmizer
-    opt = Adam(0.001)
+    # instantiate the optimizer
+    lr = 0.001
+    opt = Adam(lr)
 
     # in this example the dict is built in such a way that for each layer before the dense section
     # a multiplier is associated with a value reduced to the previous one by a factor of root of two
@@ -74,5 +73,5 @@ if __name__ == '__main__':
             multiplier |= {layer : current_mul}
             current_mul /= lr_factor
     
-    # use the wrapper to instantiate the optimizer and multiplier values
-    opt = Multiplier(opt, multiplier)
+    # use the wrapper to instantiate the optimizer and multiplier values for the learning rate
+    opt = LayerWiseLR(opt, multiplier, lr)
