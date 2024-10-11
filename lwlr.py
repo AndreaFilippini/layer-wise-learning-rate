@@ -8,6 +8,13 @@ from keras.applications.vgg16 import VGG16
 import math
 
 class LayerWiseLR(Optimizer):
+    """
+    Wrapper used to implement multipliers for the gradient for specific layers in the model
+    Arguments:
+        optimizer: instance of the optimizer
+        multiplier: dictionary containing pairs of {layer name : multiplier}
+        learning rate: initial learning rate of the optimizer
+    """
     def __init__(self, optimizer, multiplier, learning_rate=0.001, name="LWLR", **kwargs):
         if hasattr(optimizer, 'update_step'):
             super().__init__(learning_rate, **kwargs)
@@ -61,7 +68,7 @@ if __name__ == '__main__':
     multiplier = {}
     new_keras = hasattr(opt, 'update_step')
     trainable = [(layer.path if new_keras else layer.name).split('/')[0] for layer in model.trainable_variables]
-    # for each successive variable, i'll have a reduction by a factor of sqrt(2)
+    # for each successive variable, i've a reduction by a factor of sqrt(2)
     current_mul = 1
     lr_factor = math.sqrt(2)
     # iterate over each trainable layer, skipping one (kernel and bias pairs)
