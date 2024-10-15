@@ -9,7 +9,7 @@ import math
 
 class LayerWiseLR(Optimizer):
     """
-    Wrapper used to implement multipliers for the gradient for specific layers in the model
+    Wrapper used to implement multipliers for the learning rate of specific layers in the model
     Arguments:
         optimizer: instance of the optimizer
         multiplier: dictionary containing pairs of {layer name : multiplier}
@@ -24,7 +24,7 @@ class LayerWiseLR(Optimizer):
         self._optimizer = optimizer
         self._multiplier = multiplier
 
-    # function used to apply a multiplier to a specific layer
+    # function used to apply a multiplier to the learning rate of a specific layer
     def mul_param(self, param, var):
         # get layer name
         layer_key = var.name.split('/')[0]      
