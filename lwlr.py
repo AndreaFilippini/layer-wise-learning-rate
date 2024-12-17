@@ -16,43 +16,43 @@ class LayerWiseLR(Optimizer):
         learning rate: initial learning rate of the optimizer
     """
     def __init__(self, optimizer, multiplier, learning_rate=0.001, name="LWLR", **kwargs):
-        if hasattr(optimizer, 'update_step'):
-            super().__init__(learning_rate, **kwargs)
-        else:
+        # checks for the presence of the _HAS_AGGREGATE_GRAD attribute,
+        # present since version 2.11 with the introduction of the new optimizer APIs,
+        # to determine how to initialize the wrapper instance
+        if hasattr(Optimizer, "_HAS_AGGREGATE_GRAD"):
+            # wrapper initialization with new APIs, with learning rate stored in an internal slot
             super().__init__(name, **kwargs)
             self._set_hyper("learning_rate", learning_rate)
+        else:
+            # wrapper initialization with the old API, with the learning rate as an argument
+            super().__init__(learning_rate, name, **kwargs)
+
+        # storage of the attributes in the wrapper instance
+        self._learning_rate = tf.Variable(learning_rate, trainable=False, dtype=tf.float32) 
         self._optimizer = optimizer
         self._multiplier = multiplier
 
-    # function used to apply a multiplier to a specific layer
-    def mul_param(self, param, var):
-        # get layer name
-        layer_key = var.name.split('/')[0]      
-        # if there's a multiplier value associated with the layer, apply it to the parameter
-        if layer_key in self._multiplier:
-            param *= self._multiplier[layer_key]
-        return param
-            
-    # update step used in keras 3.X
-    def update_step(self, grad, var, learning_rate):
-        new_lr = self.mul_param(learning_rate, var)
-        self._optimizer.update_step(grad, var, new_lr)
-
-    def build(self, var_list):
-        super().build(var_list)
-        self._optimizer.build(var_list)
+    def apply_gradients(self, grads_and_vars, name=None, experimental_aggregate_gradients=True):
+        # initialization of the list containing the new variable-gradient pairs
+        updated_grads_and_vars = []
+        # iterates over each pair
+        for grad, var in grads_and_vars:
+            # get the current layer name, separating it from its type based on keras version
+            layer_name = (var.path if hasattr(var, 'path') else var.name).split('/')[0]
+            # apply the multiplier to gradient based on current layer
+            # if no multiplier is associated, applies 1 as default value
+            scaled_grad = grad * self._multiplier.get(layer_name, 1.0)
+            # add the updated pair to the list
+            updated_grads_and_vars.append((scaled_grad, var))
+        # synchronize the learning rate of the base optimizer with that of the wrapper,
+        # in order to apply changes due to callbacks, and then applies gradients
+        self._optimizer.learning_rate.assign(self._learning_rate)
+        self._optimizer.apply_gradients(updated_grads_and_vars)
         
-    # update step used in keras 2.X
-    @tf.function
-    def _resource_apply_dense(self, grad, var):       
-        new_lr = K.eval(self._get_hyper("learning_rate"))
-        new_lr = self.mul_param(new_lr, var)
-        self._optimizer.learning_rate.assign(new_lr)
-        self._optimizer._resource_apply_dense(grad, var)
-
     def _create_slots(self, var_list):
-        super()._create_slots(var_list)
+        # call the creation of the internal slots of the base optimizer
         self._optimizer._create_slots(var_list)
+
         
 if __name__ == '__main__':
     # load VGG16
